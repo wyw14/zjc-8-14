@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>梦境碎片收集系统</title>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="vue.global.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -43,92 +43,203 @@
       </header>
 
       <main class="content">
-        <div class="stats-header">
-          <h2 class="section-title">📊 月度统计</h2>
-          <div class="stats-selector">
-            <select v-model="selectedYear" @change="onMonthChange">
-              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}年</option>
-            </select>
-            <select v-model="selectedMonth" @change="onMonthChange">
-              <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
-            </select>
-          </div>
-        </div>
-        <div class="stats-section">
-          <div class="stat-card">
-            <div class="stat-number">{{ monthlyStats.count }}</div>
-            <div class="stat-label">{{ selectedMonth }}月梦境数</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-number">{{ monthlyStats.avgLucidity }}</div>
-            <div class="stat-label">平均清醒度</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-number">{{ dreams.length }}</div>
-            <div class="stat-label">总记录数</div>
-          </div>
+        <div class="tabs">
+          <button class="tab-btn" :class="{ active: currentTab === 'dreams' }" @click="currentTab = 'dreams'">
+            📚 梦境列表
+          </button>
+          <button class="tab-btn" :class="{ active: currentTab === 'materialbox' }" @click="currentTab = 'materialbox'">
+            🎨 创作者素材箱
+            <span v-if="materialbox.length > 0" class="tab-badge">{{ materialbox.length }}</span>
+          </button>
         </div>
 
-        <div class="two-columns">
+        <div v-show="currentTab === 'dreams'">
+          <div class="stats-header">
+            <h2 class="section-title">📊 月度统计</h2>
+            <div class="stats-selector">
+              <select v-model="selectedYear" @change="onMonthChange">
+                <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}年</option>
+              </select>
+              <select v-model="selectedMonth" @change="onMonthChange">
+                <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
+              </select>
+            </div>
+          </div>
+          <div class="stats-section">
+            <div class="stat-card">
+              <div class="stat-number">{{ monthlyStats.count }}</div>
+              <div class="stat-label">{{ selectedMonth }}月梦境数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">{{ monthlyStats.avgLucidity }}</div>
+              <div class="stat-label">平均清醒度</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">{{ dreams.length }}</div>
+              <div class="stat-label">总记录数</div>
+            </div>
+          </div>
+
+          <div class="two-columns">
+            <div class="card">
+              <h2>✨ 随机灵感</h2>
+              <div v-if="randomDream" class="random-dream">
+                <div class="dream-date">{{ randomDream.date }}</div>
+                <div class="dream-content">"{{ randomDream.content }}"</div>
+                <div class="dream-lucidity">
+                  清醒度: <span v-for="n in 5" :key="n" class="star">{{ n <= randomDream.lucidity ? '★' : '☆' }}</span>
+                </div>
+              </div>
+              <div v-else class="empty-dream">
+                点击按钮抽取一条旧灵感
+              </div>
+              <button class="btn-primary btn-large" @click="fetchRandomDream">
+                🎲 随机抽取
+              </button>
+            </div>
+
+            <div class="card">
+              <h2>📝 记录新梦境</h2>
+              <div class="form-group">
+                <label>日期</label>
+                <input v-model="newDream.date" type="date">
+              </div>
+              <div class="form-group">
+                <label>清醒度</label>
+                <div class="star-rating">
+                  <span
+                    v-for="n in 5"
+                    :key="n"
+                    class="star big"
+                    :class="{ active: n <= newDream.lucidity }"
+                    @click="newDream.lucidity = n"
+                  >★</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>梦境内容</label>
+                <textarea v-model="newDream.content" rows="5" placeholder="描述你的梦境..."></textarea>
+              </div>
+              <button class="btn-primary btn-large" @click="addDream">保存梦境</button>
+            </div>
+          </div>
+
           <div class="card">
-            <h2>✨ 随机灵感</h2>
-            <div v-if="randomDream" class="random-dream">
-              <div class="dream-date">{{ randomDream.date }}</div>
-              <div class="dream-content">"{{ randomDream.content }}"</div>
-              <div class="dream-lucidity">
-                清醒度: <span v-for="n in 5" :key="n" class="star">{{ n <= randomDream.lucidity ? '★' : '☆' }}</span>
+            <h2>📚 梦境列表</h2>
+            <div v-if="dreams.length === 0" class="empty-dream">还没有记录梦境</div>
+            <div v-else class="dream-list">
+              <div v-for="dream in dreams" :key="dream.id" class="dream-item">
+                <div class="dream-header">
+                  <span class="dream-date">{{ dream.date }}</span>
+                  <div class="dream-actions">
+                    <span class="dream-lucidity">
+                      <span v-for="n in 5" :key="n" class="star">{{ n <= dream.lucidity ? '★' : '☆' }}</span>
+                    </span>
+                    <button
+                      class="btn-material"
+                      :class="{ 'in-box': materialboxDreamIds.has(dream.id) }"
+                      @click="openAddToMaterialModal(dream)"
+                    >
+                      {{ materialboxDreamIds.has(dream.id) ? '✓ 已加入素材箱' : '+ 加入素材箱' }}
+                    </button>
+                  </div>
+                </div>
+                <div class="dream-text">{{ dream.content }}</div>
               </div>
             </div>
-            <div v-else class="empty-dream">
-              点击按钮抽取一条旧灵感
-            </div>
-            <button class="btn-primary btn-large" @click="fetchRandomDream">
-              🎲 随机抽取
-            </button>
-          </div>
-
-          <div class="card">
-            <h2>📝 记录新梦境</h2>
-            <div class="form-group">
-              <label>日期</label>
-              <input v-model="newDream.date" type="date">
-            </div>
-            <div class="form-group">
-              <label>清醒度</label>
-              <div class="star-rating">
-                <span
-                  v-for="n in 5"
-                  :key="n"
-                  class="star big"
-                  :class="{ active: n <= newDream.lucidity }"
-                  @click="newDream.lucidity = n"
-                >★</span>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>梦境内容</label>
-              <textarea v-model="newDream.content" rows="5" placeholder="描述你的梦境..."></textarea>
-            </div>
-            <button class="btn-primary btn-large" @click="addDream">保存梦境</button>
           </div>
         </div>
 
-        <div class="card">
-          <h2>📚 梦境列表</h2>
-          <div v-if="dreams.length === 0" class="empty-dream">还没有记录梦境</div>
-          <div v-else class="dream-list">
-            <div v-for="dream in dreams" :key="dream.id" class="dream-item">
-              <div class="dream-header">
-                <span class="dream-date">{{ dream.date }}</span>
-                <span class="dream-lucidity">
-                  <span v-for="n in 5" :key="n" class="star">{{ n <= dream.lucidity ? '★' : '☆' }}</span>
-                </span>
+        <div v-show="currentTab === 'materialbox'">
+          <div class="card">
+            <h2>🎨 创作者素材箱</h2>
+            <p class="material-hint">把梦境按创作形式分类整理，方便随时调用灵感</p>
+            <div v-if="materialbox.length === 0" class="empty-dream">
+              <div style="font-size: 48px; margin-bottom: 16px;">📦</div>
+              素材箱还是空的<br>
+              去「梦境列表」把喜欢的梦境加入进来吧
+            </div>
+            <div v-else class="material-groups">
+              <div v-for="tag in TAG_OPTIONS" :key="tag.key" class="material-group">
+                <div class="group-header" :style="{ borderColor: tag.color }">
+                  <span class="group-title" :style="{ color: tag.color }">{{ tag.label }}</span>
+                  <span class="group-count">{{ materialboxGrouped[tag.key].length }} 条</span>
+                </div>
+                <div v-if="materialboxGrouped[tag.key].length === 0" class="group-empty">
+                  暂无素材
+                </div>
+                <div v-else class="material-list">
+                  <div
+                    v-for="item in materialboxGrouped[tag.key]"
+                    :key="tag.key + '-' + item.id"
+                    class="material-item"
+                  >
+                    <div class="material-item-header">
+                      <span class="dream-date">{{ item.date }}</span>
+                      <span class="dream-lucidity">
+                        <span v-for="n in 5" :key="n" class="star">{{ n <= item.lucidity ? '★' : '☆' }}</span>
+                      </span>
+                    </div>
+                    <div class="dream-text">{{ item.content }}</div>
+                    <div class="material-item-tags">
+                      <span
+                        v-for="t in item.tags"
+                        :key="t"
+                        class="material-tag"
+                        :style="{ background: getTagInfo(t).color + '22', color: getTagInfo(t).color, borderColor: getTagInfo(t).color + '55' }"
+                      >
+                        {{ getTagInfo(t).label }}
+                      </span>
+                    </div>
+                    <div class="material-item-actions">
+                      <button class="btn-small" @click="openEditMaterialModal(item)">✏️ 编辑标签</button>
+                      <button class="btn-small btn-danger" @click="removeFromMaterialbox(item.id)">🗑️ 移除</button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="dream-text">{{ dream.content }}</div>
             </div>
           </div>
         </div>
       </main>
+
+      <div v-if="showMaterialModal" class="modal-overlay" @click.self="closeMaterialModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h3>{{ modalMode === 'edit' ? '编辑素材标签' : '加入素材箱' }}</h3>
+            <button class="modal-close" @click="closeMaterialModal">×</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="editingDream" class="modal-dream-preview">
+              <div class="dream-date">{{ editingDream.date }} · 清醒度
+                <span v-for="n in 5" :key="n" class="star">{{ n <= editingDream.lucidity ? '★' : '☆' }}</span>
+              </div>
+              <div class="dream-text">"{{ editingDream.content }}"</div>
+            </div>
+            <div class="form-group" style="margin-top: 20px;">
+              <label>选择可用于的创作形式（可多选）</label>
+              <div class="tag-selector">
+                <div
+                  v-for="tag in TAG_OPTIONS"
+                  :key="tag.key"
+                  class="tag-option"
+                  :class="{ selected: selectedTags.includes(tag.key) }"
+                  :style="selectedTags.includes(tag.key) ? { background: tag.color + '22', borderColor: tag.color, color: tag.color } : {}"
+                  @click="toggleTag(tag.key)"
+                >
+                  {{ tag.label }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-outline" @click="closeMaterialModal">取消</button>
+            <button class="btn-primary" style="width: auto; padding: 10px 24px;" @click="saveMaterialboxItem">
+              {{ modalMode === 'edit' ? '保存修改' : '确认加入' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

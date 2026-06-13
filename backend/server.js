@@ -6,12 +6,13 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const PORT = 3001;
+const PORT = 3114;
 const JWT_SECRET = 'dream-secret-key-2024';
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DREAMS_FILE = path.join(DATA_DIR, 'dreams.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const MATERIALBOX_FILE = path.join(DATA_DIR, 'materialbox.json');
 
 app.use(cors());
 app.use(express.json());
@@ -192,6 +193,93 @@ app.get('/api/stats/monthly', authenticateToken, (req, res) => {
     count,
     avgLucidity: parseFloat(avgLucidity)
   });
+});
+
+const VALID_TAGS = ['novel', 'painting', 'video', 'music'];
+
+app.get('/api/materialbox', authenticateToken, (req, res) => {
+  const materialbox = readJSON(MATERIALBOX_FILE);
+  const userItems = materialbox.filter(m => m.userId === req.user.id);
+  res.json(userItems);
+});
+
+app.post('/api/materialbox', authenticateToken, (req, res) => {
+  const { dreamId, tags } = req.body;
+  if (!dreamId) {
+    return res.status(400).json({ error: '梦境ID必填' });
+  }
+  if (!tags || !Array.isArray(tags) || tags.length === 0) {
+    return res.status(400).json({ error: '至少选择一个创作标签' });
+  }
+  const invalidTags = tags.filter(t => !VALID_TAGS.includes(t));
+  if (invalidTags.length > 0) {
+    return res.status(400).json({ error: '无效的标签类型' });
+  }
+
+  const dreams = readJSON(DREAMS_FILE);
+  const dream = dreams.find(d => d.id === parseInt(dreamId) && d.userId === req.user.id);
+  if (!dream) {
+    return res.status(404).json({ error: '梦境不存在' });
+  }
+
+  const materialbox = readJSON(MATERIALBOX_FILE);
+  const existing = materialbox.find(m => m.dreamId === dream.id && m.userId === req.user.id);
+  if (existing) {
+    existing.tags = tags;
+    existing.updatedAt = new Date().toISOString();
+    writeJSON(MATERIALBOX_FILE, materialbox);
+    return res.json(existing);
+  }
+
+  const newItem = {
+    id: materialbox.length > 0 ? Math.max(...materialbox.map(m => m.id)) + 1 : 1,
+    userId: req.user.id,
+    dreamId: dream.id,
+    content: dream.content,
+    lucidity: dream.lucidity,
+    date: dream.date,
+    tags: tags,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  materialbox.push(newItem);
+  writeJSON(MATERIALBOX_FILE, materialbox);
+  res.status(201).json(newItem);
+});
+
+app.put('/api/materialbox/:id', authenticateToken, (req, res) => {
+  const { tags } = req.body;
+  if (!tags || !Array.isArray(tags) || tags.length === 0) {
+    return res.status(400).json({ error: '至少选择一个创作标签' });
+  }
+  const invalidTags = tags.filter(t => !VALID_TAGS.includes(t));
+  if (invalidTags.length > 0) {
+    return res.status(400).json({ error: '无效的标签类型' });
+  }
+
+  const materialbox = readJSON(MATERIALBOX_FILE);
+  const item = materialbox.find(m => m.id === parseInt(req.params.id) && m.userId === req.user.id);
+  if (!item) {
+    return res.status(404).json({ error: '素材不存在' });
+  }
+
+  item.tags = tags;
+  item.updatedAt = new Date().toISOString();
+  writeJSON(MATERIALBOX_FILE, materialbox);
+  res.json(item);
+});
+
+app.delete('/api/materialbox/:id', authenticateToken, (req, res) => {
+  const materialbox = readJSON(MATERIALBOX_FILE);
+  const index = materialbox.findIndex(m => m.id === parseInt(req.params.id) && m.userId === req.user.id);
+  if (index === -1) {
+    return res.status(404).json({ error: '素材不存在' });
+  }
+
+  materialbox.splice(index, 1);
+  writeJSON(MATERIALBOX_FILE, materialbox);
+  res.json({ message: '已从素材箱移除' });
 });
 
 app.listen(PORT, () => {

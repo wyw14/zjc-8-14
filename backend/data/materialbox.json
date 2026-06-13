@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "dreamId": 1,
+    "content": "在一片紫色的云海中漂浮，远处有一座发光的水晶城堡，城堡的塔尖直插云霄。",
+    "lucidity": 5,
+    "date": "2026-06-01",
+    "tags": [
+      "novel",
+      "painting"
+    ],
+    "createdAt": "2026-06-13T07:46:37.409Z",
+    "updatedAt": "2026-06-13T07:46:37.409Z"
+  },
+  {
+    "id": 2,
+    "userId": 1,
+    "dreamId": 3,
+    "content": "在海底漫步，周围是五颜六色的珊瑚和会发光的鱼，我可以在水中呼吸。",
+    "lucidity": 4,
+    "date": "2026-06-10",
+    "tags": [
+      "video",
+      "music"
+    ],
+    "createdAt": "2026-06-13T07:46:37.451Z",
+    "updatedAt": "2026-06-13T07:46:37.451Z"
+  },
+  {
+    "id": 3,
+    "userId": 1,
+    "dreamId": 5,
+    "content": "在太空里行走，地球就在脚下，星星近得伸手就能摸到。",
+    "lucidity": 5,
+    "date": "2026-05-15",
+    "tags": [
+      "novel",
+      "video"
+    ],
+    "createdAt": "2026-06-13T07:46:37.459Z",
+    "updatedAt": "2026-06-13T07:46:37.459Z"
+  }
+]

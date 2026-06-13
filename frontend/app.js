@@ -1,6 +1,6 @@
 const { createApp, ref, onMounted, computed } = Vue;
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'http://localhost:3114/api';
 
 createApp({
   setup() {
@@ -16,6 +16,21 @@ createApp({
     const randomDream = ref(null);
     const monthlyStats = ref({ count: 0, avgLucidity: 0 });
 
+    const currentTab = ref('dreams');
+    const materialbox = ref([]);
+    const showMaterialModal = ref(false);
+    const modalMode = ref('add');
+    const editingDream = ref(null);
+    const editingMaterialId = ref(null);
+    const selectedTags = ref([]);
+
+    const TAG_OPTIONS = [
+      { key: 'novel', label: '📖 小说', color: '#f472b6' },
+      { key: 'painting', label: '🎨 绘画', color: '#60a5fa' },
+      { key: 'video', label: '🎬 短视频', color: '#34d399' },
+      { key: 'music', label: '🎵 音乐', color: '#fbbf24' }
+    ];
+
     const now = new Date();
     const selectedYear = ref(now.getFullYear());
     const selectedMonth = ref(now.getMonth() + 1);
@@ -27,6 +42,29 @@ createApp({
       }
       return years;
     });
+
+    const materialboxGrouped = computed(() => {
+      const groups = {};
+      TAG_OPTIONS.forEach(tag => {
+        groups[tag.key] = [];
+      });
+      materialbox.value.forEach(item => {
+        item.tags.forEach(tag => {
+          if (groups[tag]) {
+            groups[tag].push(item);
+          }
+        });
+      });
+      return groups;
+    });
+
+    const materialboxDreamIds = computed(() => {
+      return new Set(materialbox.value.map(m => m.dreamId));
+    });
+
+    function getTagInfo(key) {
+      return TAG_OPTIONS.find(t => t.key === key) || { label: key, color: '#888' };
+    }
 
     const newDream = ref({
       content: '',
@@ -125,6 +163,7 @@ createApp({
       user.value = null;
       dreams.value = [];
       randomDream.value = null;
+      materialbox.value = [];
     }
 
     async function fetchDreams() {
@@ -188,9 +227,86 @@ createApp({
       }
     }
 
+    async function fetchMaterialbox() {
+      try {
+        const data = await apiRequest('/materialbox');
+        materialbox.value = data;
+      } catch (e) {
+        console.error('获取素材箱失败', e);
+      }
+    }
+
+    function openAddToMaterialModal(dream) {
+      editingDream.value = dream;
+      editingMaterialId.value = null;
+      modalMode.value = 'add';
+      const existing = materialbox.value.find(m => m.dreamId === dream.id);
+      selectedTags.value = existing ? [...existing.tags] : [];
+      showMaterialModal.value = true;
+    }
+
+    function openEditMaterialModal(item) {
+      editingDream.value = { id: item.dreamId, content: item.content, lucidity: item.lucidity, date: item.date };
+      editingMaterialId.value = item.id;
+      modalMode.value = 'edit';
+      selectedTags.value = [...item.tags];
+      showMaterialModal.value = true;
+    }
+
+    function closeMaterialModal() {
+      showMaterialModal.value = false;
+      editingDream.value = null;
+      editingMaterialId.value = null;
+      selectedTags.value = [];
+    }
+
+    function toggleTag(tagKey) {
+      const idx = selectedTags.value.indexOf(tagKey);
+      if (idx > -1) {
+        selectedTags.value.splice(idx, 1);
+      } else {
+        selectedTags.value.push(tagKey);
+      }
+    }
+
+    async function saveMaterialboxItem() {
+      if (selectedTags.value.length === 0) {
+        alert('请至少选择一个创作标签');
+        return;
+      }
+      try {
+        if (modalMode.value === 'edit' && editingMaterialId.value) {
+          await apiRequest(`/materialbox/${editingMaterialId.value}`, {
+            method: 'PUT',
+            body: JSON.stringify({ tags: selectedTags.value })
+          });
+        } else {
+          await apiRequest('/materialbox', {
+            method: 'POST',
+            body: JSON.stringify({ dreamId: editingDream.value.id, tags: selectedTags.value })
+          });
+        }
+        closeMaterialModal();
+        fetchMaterialbox();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function removeFromMaterialbox(itemId) {
+      if (!confirm('确定要从素材箱移除吗？')) return;
+      try {
+        await apiRequest(`/materialbox/${itemId}`, { method: 'DELETE' });
+        fetchMaterialbox();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
     function loadData() {
       fetchDreams();
       fetchMonthlyStats();
+      fetchMaterialbox();
     }
 
     function createWhiteNoise() {
@@ -276,7 +392,23 @@ createApp({
       selectedYear,
       selectedMonth,
       yearOptions,
-      onMonthChange
+      onMonthChange,
+      currentTab,
+      materialbox,
+      materialboxGrouped,
+      materialboxDreamIds,
+      TAG_OPTIONS,
+      showMaterialModal,
+      modalMode,
+      editingDream,
+      selectedTags,
+      openAddToMaterialModal,
+      openEditMaterialModal,
+      closeMaterialModal,
+      toggleTag,
+      saveMaterialboxItem,
+      removeFromMaterialbox,
+      getTagInfo
     };
   }
 }).mount('#app');
