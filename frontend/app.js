@@ -49,8 +49,10 @@ createApp({
         groups[tag.key] = [];
       });
       materialbox.value.forEach(item => {
-        item.tags.forEach(tag => {
-          if (groups[tag]) {
+        const seen = new Set();
+        [...new Set(item.tags)].forEach(tag => {
+          if (groups[tag] && !seen.has(tag)) {
+            seen.add(tag);
             groups[tag].push(item);
           }
         });

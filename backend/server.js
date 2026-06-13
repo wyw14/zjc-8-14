@@ -211,7 +211,8 @@ app.post('/api/materialbox', authenticateToken, (req, res) => {
   if (!tags || !Array.isArray(tags) || tags.length === 0) {
     return res.status(400).json({ error: '至少选择一个创作标签' });
   }
-  const invalidTags = tags.filter(t => !VALID_TAGS.includes(t));
+  const dedupTags = [...new Set(tags)];
+  const invalidTags = dedupTags.filter(t => !VALID_TAGS.includes(t));
   if (invalidTags.length > 0) {
     return res.status(400).json({ error: '无效的标签类型' });
   }
@@ -225,7 +226,7 @@ app.post('/api/materialbox', authenticateToken, (req, res) => {
   const materialbox = readJSON(MATERIALBOX_FILE);
   const existing = materialbox.find(m => m.dreamId === dream.id && m.userId === req.user.id);
   if (existing) {
-    existing.tags = tags;
+    existing.tags = dedupTags;
     existing.updatedAt = new Date().toISOString();
     writeJSON(MATERIALBOX_FILE, materialbox);
     return res.json(existing);
@@ -238,7 +239,7 @@ app.post('/api/materialbox', authenticateToken, (req, res) => {
     content: dream.content,
     lucidity: dream.lucidity,
     date: dream.date,
-    tags: tags,
+    tags: dedupTags,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -253,7 +254,8 @@ app.put('/api/materialbox/:id', authenticateToken, (req, res) => {
   if (!tags || !Array.isArray(tags) || tags.length === 0) {
     return res.status(400).json({ error: '至少选择一个创作标签' });
   }
-  const invalidTags = tags.filter(t => !VALID_TAGS.includes(t));
+  const dedupTags = [...new Set(tags)];
+  const invalidTags = dedupTags.filter(t => !VALID_TAGS.includes(t));
   if (invalidTags.length > 0) {
     return res.status(400).json({ error: '无效的标签类型' });
   }
@@ -264,7 +266,7 @@ app.put('/api/materialbox/:id', authenticateToken, (req, res) => {
     return res.status(404).json({ error: '素材不存在' });
   }
 
-  item.tags = tags;
+  item.tags = dedupTags;
   item.updatedAt = new Date().toISOString();
   writeJSON(MATERIALBOX_FILE, materialbox);
   res.json(item);
